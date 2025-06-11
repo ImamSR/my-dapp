@@ -1,0 +1,98 @@
+{
+  "address": "QgW6fvDifjsGS5fKR9kZf6Ev7j1X8GrmxjYmZcmVMX8",
+  "metadata": {
+    "name": "solsharing",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "Created with Anchor"
+  },
+  "instructions": [
+    {
+      "name": "upload_paper",
+      "discriminator": [
+        184,
+        107,
+        47,
+        234,
+        181,
+        100,
+        167,
+        33
+      ],
+      "accounts": [
+        {
+          "name": "paper",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "author"
+              },
+              {
+                "kind": "arg",
+                "path": "title"
+              }
+            ]
+          }
+        },
+        {
+          "name": "author",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "title",
+          "type": "string"
+        },
+        {
+          "name": "ipfs_hash",
+          "type": "string"
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "Paper",
+      "discriminator": [
+        23,
+        208,
+        255,
+        36,
+        198,
+        93,
+        63,
+        12
+      ]
+    }
+  ],
+  "types": [
+    {
+      "name": "Paper",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "title",
+            "type": "string"
+          },
+          {
+            "name": "ipfs_hash",
+            "type": "string"
+          },
+          {
+            "name": "author",
+            "type": "pubkey"
+          }
+        ]
+      }
+    }
+  ]
+}

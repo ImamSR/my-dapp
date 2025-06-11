@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>📚 Uploaded Papers</title>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
+</head>
+<body class="bg-gray-100 min-h-screen p-4 sm:p-8">
+  <div class="w-full max-w-4xl mx-auto bg-white rounded-xl shadow-xl p-6 sm:p-8">
+
+    <div class="flex justify-between items-center mb-6 border-b pb-4">
+      <h1 class="text-3xl font-bold text-purple-700">📄 Uploaded Research</h1>
+      
+      <a href="/" class="bg-purple-600 hover:bg-purple-700 text-white font-semibold px-5 py-2 rounded-lg shadow hover:shadow-md transition-all duration-150 flex items-center space-x-2">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+          <path fill-rule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd" />
+        </svg>
+        <span>Back to Upload</span>
+      </a>
+    </div>
+
+    <div id="loading-state" class="text-center text-gray-500 py-8">
+      <p>📡 Fetching data from the Solana blockchain...</p>
+    </div>
+
+    <ul id="metadata-list" class="space-y-4 text-gray-800"></ul>
+  </div>
+
+  <script type="module" src="/src/viewer.js"></script>
+</body>
+</html>
