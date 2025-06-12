@@ -6,6 +6,48 @@ import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 import { uploadToIPFS } from "./ipfs.js";
 import { submitToSolana } from "./solana.js";
 
+// A simple component for the user guide
+function UserGuide() {
+  // Solana transaction fees are very low. The base fee is 0.000005 SOL per signature.
+  // We'll show a slightly higher, more realistic estimate to be safe.
+  const estimatedFeeSOL = 0.00001; // In SOL
+
+  // As of mid-2025, SOL is approximately $158 USD.
+  // This is a static estimate. For a live price, you would need a crypto price API.
+  const solPriceUSD = 158; 
+  const estimatedFeeUSD = (estimatedFeeSOL * solPriceUSD).toFixed(5); // Format to 5 decimal places
+
+  return (
+    <div className="mb-6 p-4 bg-purple-50 border border-purple-200 rounded-lg">
+      <h2 className="text-lg font-semibold text-purple-800 mb-3">How It Works 📝</h2>
+      <ol className="list-decimal list-inside text-sm text-gray-700 space-y-2">
+        <li>
+          <strong>Connect Your Wallet:</strong> Use the button below to connect your Solana wallet.
+        </li>
+        <li>
+          <strong>Fill in Details:</strong> Provide a title and select your research file.
+        </li>
+        <li>
+          <strong>Agree & Publish:</strong> Accept the terms and click "Publish" to approve the transaction in your wallet.
+          {/* New Gas Fee Information */}
+          <div className="mt-2 pl-4 text-xs">
+            <p className="text-purple-700">
+              <span className="font-semibold">Gas Fee:</span> A small network fee is required to store data on the blockchain.
+            </p>
+            <p className="text-gray-600">
+              - Est. Fee: ~{estimatedFeeSOL} SOL (~${estimatedFeeUSD} USD)
+            </p>
+          </div>
+        </li>
+        <li>
+          <strong>Verify:</strong> Once complete, your file is stored on IPFS and the metadata is on the Solana blockchain!
+        </li>
+      </ol>
+    </div>
+  );
+}
+
+
 function App() {
   const wallet = useWallet();
   const [selectedFile, setSelectedFile] = useState(null);
@@ -13,6 +55,9 @@ function App() {
   const [status, setStatus] = useState({ msg: 'Please connect your wallet to begin.', type: 'neutral' });
   const [isLoading, setIsLoading] = useState(false);
   const [fileName, setFileName] = useState('');
+  
+  // NEW: State for the policy agreement checkbox
+  const [isPolicyAgreed, setIsPolicyAgreed] = useState(false);
 
   const updateStatus = (msg, type) => setStatus({ msg, type });
 
@@ -20,6 +65,7 @@ function App() {
     setSelectedFile(null);
     setTitle('');
     setFileName('');
+    setIsPolicyAgreed(false); // Reset checkbox on form reset
   }, []);
 
   const handleFileChange = (e) => {
@@ -37,6 +83,10 @@ function App() {
     if (!title.trim() || !selectedFile) {
       return updateStatus('Please provide a title and select a file.', 'error');
     }
+    // Check if the policy is agreed to
+    if (!isPolicyAgreed) {
+      return updateStatus('You must agree to the terms before publishing.', 'error');
+    }
     
     setIsLoading(true);
     let ipfsHash = null;
@@ -47,7 +97,6 @@ function App() {
       if (!ipfsHash) throw new Error("Received an empty hash from IPFS.");
       
       updateStatus(`📦 IPFS Hash: ${ipfsHash.substring(0, 10)}...\n⏳ 2/2: Saving to Solana...`, 'processing');
-      // Pass the wallet object from the hook directly
       const txSignature = await submitToSolana(title, ipfsHash, wallet);
       if (!txSignature) throw new Error("Failed to get a transaction signature from Solana.");
       
@@ -66,9 +115,9 @@ function App() {
     }
   };
 
-  const isFormSubmittable = wallet.connected && title.trim() !== '' && selectedFile;
+  // The publish button is now disabled until the checkbox is ticked
+  const isFormSubmittable = wallet.connected && title.trim() !== '' && selectedFile && isPolicyAgreed;
   
-  // Define status color classes
   const statusColor = {
     error: 'text-red-600',
     success: 'text-green-600',
@@ -83,6 +132,9 @@ function App() {
             <h1 className="text-3xl font-bold text-gray-800">Publish Your Research</h1>
             <p className="text-sm text-gray-500">Securely upload to IPFS & Solana</p>
         </div>
+
+        {/* The new User Guide component */}
+        <UserGuide />
 
         <div className="flex justify-center">
             <WalletMultiButton />
@@ -99,8 +151,28 @@ function App() {
                 <label htmlFor="fileInput" className="cursor-pointer border-2 border-dashed border-gray-300 p-6 flex flex-col items-center justify-center transition hover:bg-gray-50">
                     <p className="mt-2 text-sm text-gray-500"><span className="font-semibold text-purple-600">Click to upload</span> or drag and drop</p>
                 </label>
-                <input type="file" id="fileInput" onChange={handleFileChange} accept=".pdf" className="hidden" />
+                <input type="file" id="fileInput" onChange={handleFileChange} accept=".pdf,.doc,.docx" className="hidden" />
                 <p className="mt-2 text-xs text-gray-500">{fileName}</p>
+            </div>
+
+            {/* The new Policy Agreement checkbox */}
+            <div className="flex items-start">
+              <div className="flex items-center h-5">
+                <input
+                  id="policy-agreement"
+                  name="policy-agreement"
+                  type="checkbox"
+                  checked={isPolicyAgreed}
+                  onChange={(e) => setIsPolicyAgreed(e.target.checked)}
+                  className="focus:ring-purple-500 h-4 w-4 text-purple-600 border-gray-300 rounded"
+                />
+              </div>
+              <div className="ml-3 text-sm">
+                <label htmlFor="policy-agreement" className="font-medium text-gray-700">
+                  I agree to the Terms of Service.
+                </label>
+                <p className="text-gray-500">I understand that my file will be uploaded to the public IPFS network and its metadata will be stored permanently on the Solana blockchain.</p>
+              </div>
             </div>
 
             <button onClick={handleUpload} disabled={!isFormSubmittable || isLoading} className="bg-green-500 hover:bg-green-600 text-white font-semibold px-6 py-3 rounded-lg w-full flex items-center justify-center space-x-2 transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed">
