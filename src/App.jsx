@@ -1,21 +1,17 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 
-// Assume these functions are still in their respective files
+// Assume these functions are in their respective files and are correctly configured
 import { uploadToIPFS } from "./ipfs.js";
 import { submitToSolana } from "./solana.js";
 
-// A simple component for the user guide
-// A simple component for the user guide, now with a gas fee explanation
+// A self-contained component for the user guide
 function UserGuide() {
-  // Solana transaction fees are very low. The base fee is 0.000005 SOL per signature.
-  // We'll show a slightly higher, more realistic estimate to be safe.
-  const estimatedFeeSOL = 0.00001; // In SOL
-
-
-  const solPriceUSD = 158; 
-  const estimatedFeeUSD = (estimatedFeeSOL * solPriceUSD).toFixed(5); // Format to 5 decimal places
+  // Static fee estimation for display purposes
+  const estimatedFeeSOL = 0.00001; 
+  const solPriceUSD = 158; // Static price for USD conversion example
+  const estimatedFeeUSD = (estimatedFeeSOL * solPriceUSD).toFixed(5);
 
   return (
     <div className="mb-6 p-4 bg-purple-50 border border-purple-200 rounded-lg">
@@ -29,10 +25,9 @@ function UserGuide() {
         </li>
         <li>
           <strong>Agree & Publish:</strong> Accept the terms and click "Publish" to approve the transaction in your wallet.
-          {/* New Gas Fee Information */}
           <div className="mt-2 pl-4 text-xs">
             <p className="text-purple-700">
-              <span className="font-semibold">Gas Fee:</span> A small network fee is required to store data on the blockchain.
+              <span className="font-semibold">Gas Fee:</span> A small network fee is required.
             </p>
             <p className="text-gray-600">
               - Est. Fee: ~{estimatedFeeSOL} SOL (~${estimatedFeeUSD} USD)
@@ -40,25 +35,23 @@ function UserGuide() {
           </div>
         </li>
         <li>
-          <strong>Verify:</strong> Once complete, your file is stored on IPFS and the metadata is on the Solana blockchain!
+          <strong>Verify:</strong> Your file is stored on IPFS and its metadata is on the Solana blockchain!
         </li>
       </ol>
     </div>
   );
 }
 
-
-
+// The main application component
 function App() {
   const wallet = useWallet();
   const [selectedFile, setSelectedFile] = useState(null);
   const [title, setTitle] = useState('');
-  const [status, setStatus] = useState({ msg: 'Please connect your wallet to begin.', type: 'neutral' });
+  const [status, setStatus] = useState({ msg: '', type: 'neutral' });
   const [isLoading, setIsLoading] = useState(false);
   const [fileName, setFileName] = useState('');
-  
-  // NEW: State for the policy agreement checkbox
   const [isPolicyAgreed, setIsPolicyAgreed] = useState(false);
+  const [showPolicyWarning, setShowPolicyWarning] = useState(false);
 
   const updateStatus = (msg, type) => setStatus({ msg, type });
 
@@ -66,7 +59,7 @@ function App() {
     setSelectedFile(null);
     setTitle('');
     setFileName('');
-    setIsPolicyAgreed(false); // Reset checkbox on form reset
+    setIsPolicyAgreed(false);
   }, []);
 
   const handleFileChange = (e) => {
@@ -84,7 +77,6 @@ function App() {
     if (!title.trim() || !selectedFile) {
       return updateStatus('Please provide a title and select a file.', 'error');
     }
-    // Check if the policy is agreed to
     if (!isPolicyAgreed) {
       return updateStatus('You must agree to the terms before publishing.', 'error');
     }
@@ -116,9 +108,21 @@ function App() {
     }
   };
 
-  // The publish button is now disabled until the checkbox is ticked
+  // Logic to determine if the main button should be enabled
   const isFormSubmittable = wallet.connected && title.trim() !== '' && selectedFile && isPolicyAgreed;
   
+  // Logic to dynamically show the policy warning hint
+  useEffect(() => {
+    const everythingIsFilledButPolicy = 
+      wallet.connected &&
+      title.trim() !== '' &&
+      selectedFile &&
+      !isPolicyAgreed;
+
+    setShowPolicyWarning(everythingIsFilledButPolicy);
+  }, [wallet.connected, title, selectedFile, isPolicyAgreed]);
+
+  // Dynamically sets the color of the status message
   const statusColor = {
     error: 'text-red-600',
     success: 'text-green-600',
@@ -127,14 +131,13 @@ function App() {
   }[status.type];
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-4 sm:p-6">
+    <div className="min-h-screen flex flex-col items-center justify-center p-4 sm:p-6 bg-gray-50">
       <div className="w-full max-w-lg bg-white rounded-xl shadow-xl p-6 sm:p-8 space-y-6">
         <div className="text-center">
             <h1 className="text-3xl font-bold text-gray-800">Publish Your Research</h1>
             <p className="text-sm text-gray-500">Securely upload to IPFS & Solana</p>
         </div>
 
-        {/* The new User Guide component */}
         <UserGuide />
 
         <div className="flex justify-center">
@@ -156,7 +159,6 @@ function App() {
                 <p className="mt-2 text-xs text-gray-500">{fileName}</p>
             </div>
 
-            {/* The new Policy Agreement checkbox */}
             <div className="flex items-start">
               <div className="flex items-center h-5">
                 <input
@@ -172,9 +174,15 @@ function App() {
                 <label htmlFor="policy-agreement" className="font-medium text-gray-700">
                   I agree to the Terms of Service.
                 </label>
-                <p className="text-gray-500">I understand that my file will be uploaded to the public IPFS network and its metadata will be stored permanently on the Solana blockchain.</p>
+                <p className="text-gray-500">I understand my file will be uploaded to the public IPFS network and its metadata will be stored permanently on the Solana blockchain.</p>
               </div>
             </div>
+
+            {showPolicyWarning && (
+              <div className="text-center text-red-500 text-sm font-semibold -mt-2">
+                Please agree to the terms to enable publishing.
+              </div>
+            )}
 
             <button onClick={handleUpload} disabled={!isFormSubmittable || isLoading} className="bg-green-500 hover:bg-green-600 text-white font-semibold px-6 py-3 rounded-lg w-full flex items-center justify-center space-x-2 transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed">
                 <span>{isLoading ? 'Processing...' : 'Publish Paper'}</span>
