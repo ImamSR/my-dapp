@@ -16,8 +16,6 @@ export default function WalletProvider({ children }) {
 
   const wallets = useMemo(
     () => [
-      new PhantomWalletAdapter(),
-      new SolflareWalletAdapter(),
     ],
     []
   );
@@ -25,7 +23,7 @@ export default function WalletProvider({ children }) {
   return (
     // This <ConnectionProvider> tells the wallet which network to use
     <ConnectionProvider endpoint={endpoint}>
-      <SolanaWalletProvider wallets={wallets} autoConnect>
+      <SolanaWalletProvider wallets={wallets} >
         <WalletModalProvider>
           {children}
         </WalletModalProvider>

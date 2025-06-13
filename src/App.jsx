@@ -2,41 +2,29 @@ import React, { useState, useCallback, useEffect } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 
-// Assume these functions are in their respective files and are correctly configured
+// Make sure these functions are in their respective files
 import { uploadToIPFS } from "./ipfs.js";
-import { submitToSolana } from "./solana.js";
+import { submitToSolana, checkIfPaperExists } from "./solana.js"; // checkIfPaperExists should also use the non-hashing logic
 
-// A self-contained component for the user guide
+// A component for the user guide
 function UserGuide() {
-  // Static fee estimation for display purposes
   const estimatedFeeSOL = 0.00001; 
-  const solPriceUSD = 158; // Static price for USD conversion example
+  const solPriceUSD = 158; // Example static price
   const estimatedFeeUSD = (estimatedFeeSOL * solPriceUSD).toFixed(5);
 
   return (
     <div className="mb-6 p-4 bg-purple-50 border border-purple-200 rounded-lg">
       <h2 className="text-lg font-semibold text-purple-800 mb-3">How It Works 📝</h2>
       <ol className="list-decimal list-inside text-sm text-gray-700 space-y-2">
-        <li>
-          <strong>Connect Your Wallet:</strong> Use the button below to connect your Solana wallet.
-        </li>
-        <li>
-          <strong>Fill in Details:</strong> Provide a title and select your research file.
-        </li>
-        <li>
-          <strong>Agree & Publish:</strong> Accept the terms and click "Publish" to approve the transaction in your wallet.
+        <li><strong>Connect Wallet:</strong> Use the button below to connect your Solana wallet.</li>
+        <li><strong>Fill in Details:</strong> Provide a title (max 32 bytes) and select your research file.</li>
+        <li><strong>Agree & Publish:</strong> Accept the terms and click "Publish" to approve the transaction.
           <div className="mt-2 pl-4 text-xs">
-            <p className="text-purple-700">
-              <span className="font-semibold">Gas Fee:</span> A small network fee is required.
-            </p>
-            <p className="text-gray-600">
-              - Est. Fee: ~{estimatedFeeSOL} SOL (~${estimatedFeeUSD} USD)
-            </p>
+            <p className="text-purple-700"><span className="font-semibold">Gas Fee:</span> A small network fee is required.</p>
+            <p className="text-gray-600">- Est. Fee: ~{estimatedFeeSOL} SOL (~${estimatedFeeUSD} USD)</p>
           </div>
         </li>
-        <li>
-          <strong>Verify:</strong> Your file is stored on IPFS and its metadata is on the Solana blockchain!
-        </li>
+        <li><strong>Verify:</strong> Your file is stored on IPFS and its metadata is on the Solana blockchain!</li>
       </ol>
     </div>
   );
@@ -51,7 +39,9 @@ function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [fileName, setFileName] = useState('');
   const [isPolicyAgreed, setIsPolicyAgreed] = useState(false);
-  const [showPolicyWarning, setShowPolicyWarning] = useState(false);
+  
+  // State for the title length validation error
+  const [titleError, setTitleError] = useState('');
 
   const updateStatus = (msg, type) => setStatus({ msg, type });
 
@@ -74,6 +64,10 @@ function App() {
     if (!wallet.connected || !wallet.publicKey) {
       return updateStatus('Please connect your wallet first.', 'error');
     }
+    // Final check for title length before submitting
+    if (titleError) {
+      return updateStatus(titleError, 'error');
+    }
     if (!title.trim() || !selectedFile) {
       return updateStatus('Please provide a title and select a file.', 'error');
     }
@@ -82,12 +76,17 @@ function App() {
     }
     
     setIsLoading(true);
-    let ipfsHash = null;
-
+    
     try {
+      updateStatus("Checking for existing paper on-chain...", 'processing');
+      const alreadyExists = await checkIfPaperExists(title.trim(), wallet);
+      if (alreadyExists) {
+        throw new Error("You have already published a paper with this exact title.");
+      }
+
       updateStatus("⏳ 1/2: Uploading file to IPFS...", 'processing');
-      ipfsHash = await uploadToIPFS(selectedFile);
-      if (!ipfsHash) throw new Error("Received an empty hash from IPFS.");
+      const ipfsHash = await uploadToIPFS(selectedFile);
+      if (!ipfsHash) throw new Error("Failed to upload file to IPFS.");
       
       updateStatus(`📦 IPFS Hash: ${ipfsHash.substring(0, 10)}...\n⏳ 2/2: Saving to Solana...`, 'processing');
       const txSignature = await submitToSolana(title, ipfsHash, wallet);
@@ -98,31 +97,27 @@ function App() {
 
     } catch (err) {
       console.error("❌ Upload process failed:", err);
-      let finalErrorMessage = `❌ Upload failed: ${err.message}`;
-      if (ipfsHash) {
-          finalErrorMessage += `\n❗ File uploaded to IPFS (Hash: ${ipfsHash}) but failed to save on Solana. Please save this hash.`;
-      }
+      const finalErrorMessage = `❌ Upload failed: ${err.message}`;
       updateStatus(finalErrorMessage, 'error');
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Logic to determine if the main button should be enabled
-  const isFormSubmittable = wallet.connected && title.trim() !== '' && selectedFile && isPolicyAgreed;
-  
-  // Logic to dynamically show the policy warning hint
+  // useEffect hook to validate title length in real-time
   useEffect(() => {
-    const everythingIsFilledButPolicy = 
-      wallet.connected &&
-      title.trim() !== '' &&
-      selectedFile &&
-      !isPolicyAgreed;
+    // TextEncoder is the standard way to check byte length in JavaScript
+    const titleBytes = new TextEncoder().encode(title);
+    if (titleBytes.length > 32) {
+      setTitleError(`Title is too long (${titleBytes.length}/32 bytes). Please shorten it.`);
+    } else {
+      setTitleError('');
+    }
+  }, [title]);
 
-    setShowPolicyWarning(everythingIsFilledButPolicy);
-  }, [wallet.connected, title, selectedFile, isPolicyAgreed]);
-
-  // Dynamically sets the color of the status message
+  // Button is disabled until all conditions are met, including the title length check
+  const isFormSubmittable = wallet.connected && title.trim() !== '' && !titleError && selectedFile && isPolicyAgreed;
+  
   const statusColor = {
     error: 'text-red-600',
     success: 'text-green-600',
@@ -134,7 +129,7 @@ function App() {
     <div className="min-h-screen flex flex-col items-center justify-center p-4 sm:p-6 bg-gray-50">
       <div className="w-full max-w-lg bg-white rounded-xl shadow-xl p-6 sm:p-8 space-y-6">
         <div className="text-center">
-            <h1 className="text-3xl font-bold text-gray-800">Publish Your Research</h1>
+            <h1 className="text-3xl font-bold text-gray-800">Decentralized Science Framework</h1>
             <p className="text-sm text-gray-500">Securely upload to IPFS & Solana</p>
         </div>
 
@@ -147,7 +142,15 @@ function App() {
         <fieldset disabled={!wallet.connected || isLoading} className="space-y-6">
             <div>
                 <label htmlFor="titleInput" className="block text-sm font-medium text-gray-700 mb-1">Paper Title</label>
-                <input type="text" id="titleInput" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g., Breakthrough in Quantum Entanglement" className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-purple-500 focus:border-purple-500 sm:text-sm" />
+                <input 
+                  type="text" 
+                  id="titleInput" 
+                  value={title} 
+                  onChange={(e) => setTitle(e.target.value)} 
+                  placeholder="e.g., A Brief History of Time" 
+                  className={`mt-1 block w-full border rounded-md shadow-sm py-2 px-3 focus:outline-none sm:text-sm ${titleError ? 'border-red-500 focus:ring-red-500 focus:border-red-500' : 'border-gray-300 focus:ring-purple-500 focus:border-purple-500'}`}
+                />
+                {titleError && <p className="mt-1 text-xs text-red-600">{titleError}</p>}
             </div>
 
             <div>
@@ -171,18 +174,10 @@ function App() {
                 />
               </div>
               <div className="ml-3 text-sm">
-                <label htmlFor="policy-agreement" className="font-medium text-gray-700">
-                  I agree to the Terms of Service.
-                </label>
+                <label htmlFor="policy-agreement" className="font-medium text-gray-700">I agree to the Terms of Service.</label>
                 <p className="text-gray-500">I understand my file will be uploaded to the public IPFS network and its metadata will be stored permanently on the Solana blockchain.</p>
               </div>
             </div>
-
-            {showPolicyWarning && (
-              <div className="text-center text-red-500 text-sm font-semibold -mt-2">
-                Please agree to the terms to enable publishing.
-              </div>
-            )}
 
             <button onClick={handleUpload} disabled={!isFormSubmittable || isLoading} className="bg-green-500 hover:bg-green-600 text-white font-semibold px-6 py-3 rounded-lg w-full flex items-center justify-center space-x-2 transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed">
                 <span>{isLoading ? 'Processing...' : 'Publish Paper'}</span>

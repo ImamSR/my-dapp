@@ -1,66 +1,58 @@
 import { Buffer } from "buffer";
-// Make sure to import clusterApiUrl
 import { Connection, PublicKey, SystemProgram, clusterApiUrl } from "@solana/web3.js";
 import { AnchorProvider, Program } from "@coral-xyz/anchor";
 import idl from "./idl.json";
 
-// --- Configuration for Devnet ---
-
-// 1. IMPORTANT: Make sure this is your correct Program ID from deploying to Devnet
-const programId = new PublicKey("QgW6fvDifjsGS5fKR9kZf6Ev7j1X8GrmxjYmZcmVMX8"); // Replace if you have a new Devnet ID
-
-// 2. FIX: Change the connection to point to the Devnet cluster
+const programId = new PublicKey("QgW6fvDifjsGS5fKR9kZf6Ev7j1X8GrmxjYmZcmVMX8");
 const connection = new Connection(clusterApiUrl("devnet"), "confirmed");
 
-
-/**
- * Creates a provider instance using the connected wallet.
- * @param {import('@solana/wallet-adapter-react').WalletContextState} wallet 
- * @returns {AnchorProvider}
- */
 function getProvider(wallet) {
-  // This uses the Devnet connection we created above
   const provider = new AnchorProvider(connection, wallet, AnchorProvider.defaultOptions());
   return provider;
 }
 
+// Helper function to derive the PDA WITHOUT hashing
+async function getPaperPda(title, walletPublicKey) {
+    const titleBuffer = Buffer.from(title, 'utf8');
+    // Note: No hashing is performed
+    const [pda] = await PublicKey.findProgramAddress(
+        [walletPublicKey.toBuffer(), titleBuffer],
+        programId
+    );
+    return pda;
+}
 
-/**
- * Submits the research metadata to the Solana smart contract.
- * @param {string} title - The title of the paper.
- * @param {string} ipfsHash - The IPFS CID for the paper's file.
- * @param {import('@solana/wallet-adapter-react').WalletContextState} wallet - The wallet object from the `useWallet` hook.
- * @returns {Promise<string>} - The transaction signature.
- */
-export async function submitToSolana(title, ipfsHash, wallet) {
-  if (!wallet || !wallet.publicKey) {
-    throw new Error("Wallet is not connected!");
+export async function checkIfPaperExists(title, wallet) {
+  try {
+    const paperPda = await getPaperPda(title, wallet.publicKey);
+    const accountInfo = await connection.getAccountInfo(paperPda);
+    return accountInfo !== null;
+  } catch (error) {
+    console.error("Error checking for existing paper:", error);
+    return false;
   }
+}
 
+export async function submitToSolana(title, ipfsHash, wallet) {
+  if (!wallet || !wallet.publicKey) throw new Error("Wallet not connected!");
+  
   const provider = getProvider(wallet);
   const program = new Program(idl, provider);
 
   try {
-    const [paperAccountPda] = await PublicKey.findProgramAddress(
-      [
-        wallet.publicKey.toBuffer(),
-        Buffer.from(title)
-      ],
-      program.programId
-    );
+    const paperPda = await getPaperPda(title, wallet.publicKey);
 
     const txSignature = await program.methods
       .uploadPaper(title, ipfsHash)
       .accounts({
-        paper: paperAccountPda,
+        paper: paperPda,
         author: wallet.publicKey,
         systemProgram: SystemProgram.programId,
       })
       .rpc();
 
-    console.log("✅ Metadata submitted on Solana (Devnet):", txSignature);
+    console.log("✅ Metadata submitted on Solana:", txSignature);
     return txSignature;
-
   } catch (err) {
     console.error("❌ Smart contract call failed on Devnet:", err);
     throw err;
