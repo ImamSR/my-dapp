@@ -1,5 +1,5 @@
 {
-  "address": "QgW6fvDifjsGS5fKR9kZf6Ev7j1X8GrmxjYmZcmVMX8",
+  "address": "7Rc9yjhQ9RrGFLe5WbZwQ3kqqE7bzAYDsk4tJsXXKre8",
   "metadata": {
     "name": "solsharing",
     "version": "0.1.0",
@@ -26,15 +26,31 @@
           "pda": {
             "seeds": [
               {
+                "kind": "const",
+                "value": [
+                  112,
+                  97,
+                  112,
+                  101,
+                  114
+                ]
+              },
+              {
                 "kind": "account",
                 "path": "author"
               },
               {
-                "kind": "arg",
-                "path": "title"
+                "kind": "account",
+                "path": "title_hash_seed"
               }
             ]
           }
+        },
+        {
+          "name": "title_hash_seed",
+          "docs": [
+            "The PDA is verified manually in the handler"
+          ]
         },
         {
           "name": "author",
@@ -73,6 +89,13 @@
       ]
     }
   ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "InvalidPda",
+      "msg": "The provided PDA does not match the expected address."
+    }
+  ],
   "types": [
     {
       "name": "Paper",
@@ -80,16 +103,16 @@
         "kind": "struct",
         "fields": [
           {
+            "name": "author",
+            "type": "pubkey"
+          },
+          {
             "name": "title",
             "type": "string"
           },
           {
             "name": "ipfs_hash",
             "type": "string"
-          },
-          {
-            "name": "author",
-            "type": "pubkey"
           }
         ]
       }

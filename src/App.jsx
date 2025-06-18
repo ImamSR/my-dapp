@@ -4,7 +4,7 @@ import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 
 // Make sure these functions are in their respective files
 import { uploadToIPFS } from "./ipfs.js";
-import { submitToSolana, checkIfPaperExists } from "./solana.js"; // checkIfPaperExists should also use the non-hashing logic
+import { submitToSolana, checkIfPaperExists } from "./solana.js";
 
 // A component for the user guide
 function UserGuide() {
@@ -43,14 +43,18 @@ function App() {
   // State for the title length validation error
   const [titleError, setTitleError] = useState('');
 
-  const updateStatus = (msg, type) => setStatus({ msg, type });
+  // Use useCallback to prevent this function from being recreated on every render
+  const updateStatus = useCallback((msg, type = 'neutral') => {
+    setStatus({ msg, type });
+  }, []);
 
   const resetForm = useCallback(() => {
     setSelectedFile(null);
     setTitle('');
     setFileName('');
     setIsPolicyAgreed(false);
-  }, []);
+    updateStatus('', 'neutral');
+  }, [updateStatus]);
 
   const handleFileChange = (e) => {
     const file = e.target.files[0];
@@ -64,7 +68,6 @@ function App() {
     if (!wallet.connected || !wallet.publicKey) {
       return updateStatus('Please connect your wallet first.', 'error');
     }
-    // Final check for title length before submitting
     if (titleError) {
       return updateStatus(titleError, 'error');
     }
@@ -92,8 +95,12 @@ function App() {
       const txSignature = await submitToSolana(title, ipfsHash, wallet);
       if (!txSignature) throw new Error("Failed to get a transaction signature from Solana.");
       
-      updateStatus(`✅ Success! Tx: ${txSignature.substring(0, 10)}...`, 'success');
-      resetForm();
+      updateStatus(`✅ Success! Tx: ${txSignature.substring(0, 5)} Metadata Submited To Solana Blockchain`, 'success');
+      
+      // Tunggu 3 detik sebelum mereset form agar pengguna bisa membaca pesan
+      setTimeout(() => {
+        resetForm();
+      }, 10000); 
 
     } catch (err) {
       console.error("❌ Upload process failed:", err);
@@ -106,14 +113,31 @@ function App() {
 
   // useEffect hook to validate title length in real-time
   useEffect(() => {
-    // TextEncoder is the standard way to check byte length in JavaScript
     const titleBytes = new TextEncoder().encode(title);
-    if (titleBytes.length > 32) {
-      setTitleError(`Title is too long (${titleBytes.length}/32 bytes). Please shorten it.`);
+    if (titleBytes.length > 200) {
+      setTitleError(`Title is too long (${titleBytes.length}/200 bytes). Please shorten it.`);
     } else {
       setTitleError('');
     }
   }, [title]);
+
+
+  // --- FIX IS HERE ---
+  // This useEffect provides proactive feedback about the policy agreement.
+  useEffect(() => {
+    const isFormReady = title.trim() !== '' && !titleError && selectedFile;
+    
+    // If the form is ready but the user hasn't agreed to the policy yet...
+    if (wallet.connected && isFormReady && !isPolicyAgreed) {
+      // ...show a specific, neutral-colored message.
+      updateStatus('Please agree to the policy to enable publishing.', 'neutral');
+    } 
+    // If the user fixes the issue (agrees to policy) and the message is still showing...
+    else if (status.msg === 'Please agree to the policy to enable publishing.' && isPolicyAgreed) {
+      // ...clear the message.
+      updateStatus('', 'neutral');
+    }
+  }, [title, titleError, selectedFile, isPolicyAgreed, wallet.connected, status.msg, updateStatus]);
 
   // Button is disabled until all conditions are met, including the title length check
   const isFormSubmittable = wallet.connected && title.trim() !== '' && !titleError && selectedFile && isPolicyAgreed;
@@ -122,7 +146,7 @@ function App() {
     error: 'text-red-600',
     success: 'text-green-600',
     processing: 'text-blue-600',
-    neutral: 'text-gray-600',
+    neutral: 'text-red-600',
   }[status.type];
 
   return (

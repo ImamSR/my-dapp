@@ -2,11 +2,32 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>📚 Uploaded Papers</title>
+  <title>DeSci Framework - Metadata Viewer</title>
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
+  <style>
+    .spinner {
+      border: 4px solid rgba(0, 0, 0, 0.1);
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      border-left-color: #4f46e5;
+      animation: spin 1s ease infinite;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+  </style>
 </head>
 <body class="bg-gray-100 min-h-screen p-4 sm:p-8">
-  <div class="w-full max-w-4xl mx-auto bg-white rounded-xl shadow-xl p-6 sm:p-8">
+
+  <div class="w-full max-w-4xl mx-auto">
+    <!-- Header Section -->
+    <header class="mb-8 text-center">
+      <h1 class="text-4xl font-bold text-gray-800">Research Metadata</h1>
+      <p class="text-lg text-gray-500">All published research records on the Solana blockchain.</p>
+    </header>
+    <div class="w-full max-w-4xl mx-auto bg-white rounded-xl shadow-xl p-6 sm:p-8">
 
     <div class="flex justify-between items-center mb-6 border-b pb-4">
       <h1 class="text-3xl font-bold text-purple-700">📄 DeSci Uploaded Research</h1>
@@ -19,11 +40,35 @@
       </a>
     </div>
 
-    <div id="loading-state" class="text-center text-gray-500 py-8">
-      <p>📡 Fetching data from the Solana blockchain</p>
+    <!-- Loading Spinner -->
+    <div id="loading-container" class="flex justify-center items-center py-16">
+      <div class="spinner"></div>
+      <p class="ml-4 text-gray-600">Loading data from the blockchain...</p>
     </div>
 
-    <ul id="metadata-list" class="space-y-4 text-gray-800"></ul>
+    <!-- Paper List Container -->
+    <div id="paper-list-container" class="hidden">
+      <div id="paper-list" class="space-y-4">
+        <!-- Paper items will be dynamically inserted here by viewer.js -->
+      </div>
+    </div>
+    
+    <!-- Error Message Container -->
+    <div id="error-container" class="hidden text-center bg-red-100 p-4 rounded-lg">
+      <p id="error-message" class="text-red-700"></p>
+    </div>
+
+    <!-- Pagination Controls -->
+    <div id="pagination-controls" class="hidden mt-8 flex justify-between items-center">
+      <button id="prev-button" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed">
+        &larr; Previous
+      </button>
+      <span id="page-info" class="text-gray-700"></span>
+      <button id="next-button" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed">
+        Next &rarr;
+      </button>
+    </div>
+    
   </div>
 
   <script type="module" src="/src/viewer.js"></script>
