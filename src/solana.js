@@ -5,6 +5,7 @@ import { Connection, PublicKey, SystemProgram, clusterApiUrl } from "@solana/web
 import { AnchorProvider, Program } from "@coral-xyz/anchor";
 import { sha256 } from '@noble/hashes/sha256'; // Library untuk hashing
 import idl from "./idl.json";
+import {  sendAndConfirmTransaction,Transaction} from "@solana/web3.js";
 
 // --- Konfigurasi ---
 const programId = new PublicKey("7Rc9yjhQ9RrGFLe5WbZwQ3kqqE7bzAYDsk4tJsXXKre8");
@@ -19,18 +20,19 @@ function getProvider(wallet) {
  * Helper function to derive PDA using the new hashing logic.
  */
 async function getPaperPdaWithHash(title, authorPublicKey) {
-    const titleHash = sha256(Buffer.from(title));
-    const titleHashSeed = new PublicKey(titleHash); // Convert hash bytes to a public key
-    
-    const [pda] = await PublicKey.findProgramAddress(
-        [
-            Buffer.from("paper"),
-            authorPublicKey.toBuffer(),
-            titleHashSeed.toBuffer(), // Use the public key's buffer as the seed
-        ],
-        programId
-    );
-    return { pda, titleHashSeed };
+  const titleHash = sha256(Buffer.from(title));
+  if (titleHash.length !== 32) throw new Error("Invalid SHA256 hash length");
+
+  const titleHashSeed = new PublicKey(titleHash); // ✅ hash must be 32 bytes
+  const [pda] = await PublicKey.findProgramAddress(
+    [
+      Buffer.from("paper"),
+      authorPublicKey.toBuffer(),
+      titleHashSeed.toBuffer()
+    ],
+    programId
+  );
+  return { pda, titleHashSeed };
 }
 
 export async function submitToSolana(title, ipfsHash, wallet) {
@@ -41,40 +43,42 @@ export async function submitToSolana(title, ipfsHash, wallet) {
   const provider = getProvider(wallet);
   const program = new Program(idl, provider);
 
-  try {
-      const { pda: paperPda, titleHashSeed } = await getPaperPdaWithHash(title, wallet.publicKey);
-      
-      const tx = await program.methods
-        .uploadPaper(title, ipfsHash)
-        .accounts({
-          paper: paperPda,
-          titleHashSeed: titleHashSeed, // Pass the hash key as the seed account
-          author: wallet.publicKey,
-          systemProgram: SystemProgram.programId,
-        })
-        .rpc();
+  const { pda: paperPda, titleHashSeed } = await getPaperPdaWithHash(title, wallet.publicKey);
 
-      console.log("✅ Metadata submitted on Solana:", tx);
-      return tx;
-  } catch (err) {
-      console.error("❌ Smart contract call failed:", err);
-      if (err.logs) {
-          console.error("Solana Logs:", err.logs);
-      }
-      throw new Error(`Smart contract call failed: ${err.message}`);
-  }
+  console.log("📄 PDA:", paperPda.toBase58());
+  console.log("🔑 Hash seed:", titleHashSeed.toBase58());
+
+  const tx = await program.methods
+    .uploadPaper(title, ipfsHash)
+    .accounts({
+      paper: paperPda,
+      titleHashSeed,
+      author: wallet.publicKey,
+      systemProgram: SystemProgram.programId,
+    })
+    .transaction(); // build Transaction object instead of sending directly
+
+  tx.feePayer = wallet.publicKey;
+  tx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
+
+  // sign and send manually to avoid reuse issues
+  const signed = await wallet.signTransaction(tx);
+  const txid = await connection.sendRawTransaction(signed.serialize());
+
+  console.log("✅ TX submitted:", txid);
+  return txid;
 }
 
 export async function checkIfPaperExists(title, wallet) {
   if (!wallet || !wallet.publicKey) return false;
 
   try {
-      const { pda: paperPda } = await getPaperPdaWithHash(title, wallet.publicKey);
-      const account = await connection.getAccountInfo(paperPda);
-      return account !== null;
-  } catch(e) {
-      console.error("Error checking for existing paper:", e);
-      return false;
+    const { pda: paperPda } = await getPaperPdaWithHash(title, wallet.publicKey);
+    const account = await connection.getAccountInfo(paperPda);
+    return account !== null;
+  } catch (e) {
+    console.error("Error checking for existing paper:", e);
+    return false;
   }
 }
 
@@ -87,27 +91,33 @@ export async function fetchAllPaperAccounts() {
     const accounts = await program.account.paper.all();
     const accountsWithTxids = [];
 
-    // Fetch transaction signatures sequentially to avoid rate-limiting
     for (const paper of accounts) {
       try {
-          const signatures = await connection.getSignaturesForAddress(paper.publicKey, { limit: 1 });
-          const txid = signatures.length > 0 ? signatures[0].signature : null;
-          
-          accountsWithTxids.push({
-            publicKey: paper.publicKey,
-            account: {
-              ...paper.account,
-              txid: txid
-            }
-          });
+        const signatures = await connection.getSignaturesForAddress(paper.publicKey, { limit: 1 });
+        const txid = signatures.length > 0 ? signatures[0].signature : null;
+
+        accountsWithTxids.push({
+          publicKey: paper.publicKey,
+          account: {
+            ...paper.account,
+            txid
+          }
+        });
       } catch (e) {
-          console.warn(`Could not fetch signature for account ${paper.publicKey.toString()}`);
-          accountsWithTxids.push({ publicKey: paper.publicKey, account: { ...paper.account, txid: null } });
+        console.warn(`Could not fetch signature for account ${paper.publicKey.toBase58()}`);
+        accountsWithTxids.push({
+          publicKey: paper.publicKey,
+          account: {
+            ...paper.account,
+            txid: null
+          }
+        });
       }
     }
+
     return accountsWithTxids;
   } catch (error) {
     console.error("Error fetching all paper accounts:", error);
-    throw new Error("Failed to fetch data from Solana. Using a dedicated RPC provider is highly recommended.");
+    throw new Error("Failed to fetch data from Solana.");
   }
 }
