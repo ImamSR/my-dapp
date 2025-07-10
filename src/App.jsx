@@ -50,11 +50,25 @@ function App() {
   }, []);
 
   const handleFileChange = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      setSelectedFile(file);
-    }
-  };
+  const file = e.target.files[0];
+
+  if (!file) return;
+
+  const maxSizeMB = 10;
+  const maxSizeBytes = maxSizeMB * 1024 * 1024;
+
+  if (file.size > maxSizeBytes) {
+    MySwal.fire({
+      icon: 'warning',
+      title: 'File Too Large',
+      text: `The selected file exceeds the 10MB limit.`,
+    });
+    e.target.value = ''; // clear input
+    return;
+  }
+
+  setSelectedFile(file);
+};
 
   const handleRemoveFile = () => {
     setSelectedFile(null);
@@ -185,6 +199,7 @@ function App() {
                   className="hidden"
                   onChange={handleFileChange}
                   accept=".pdf"
+                  size={10*1000*1024}
                 />
               </label>
             ) : (
