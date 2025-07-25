@@ -90,8 +90,6 @@ function App() {
         didOpen: () => { Swal.showLoading() }
       });
 
-      // const alreadyExists = await checkIfPaperExists(title.trim(), wallet);
-      // if (alreadyExists) throw new Error("A paper with this exact title has already been published by your wallet.");
 
       const ipfsHash = await uploadToIPFS(selectedFile);
       if (!ipfsHash) throw new Error("Failed to upload file to IPFS.");
@@ -110,12 +108,31 @@ function App() {
       });
 
     } catch (err) {
+      console.error("❌ Upload process failed:", err);
+      
+      let errorTitle = 'Upload Failed';
+      let errorText = err.message;
+
+      const errorMessage = err.message.toLowerCase();
+
+     
+      if (errorMessage.includes("user rejected")) {
+        errorTitle = 'Transaction Cancelled';
+        errorText = 'User cancelled the transaction approval in your wallet.';
+      } else if (errorMessage.includes("found no record of a prior credit")) {
+        errorTitle = 'Insufficient SOL Balance';
+        errorText = 'User wallet does not have enough SOL to pay for transaction fees. Please airdrop some Devnet SOL and try again.';
+      } else if (errorMessage.includes("Allocate: account Address") || errorMessage.includes("already in use")) {
+        errorTitle = 'Duplicate Submission';
+        errorText = "User have already published a paper with this exact title. Please use a new title and new file.";
+      }
+      
       MySwal.fire({
         icon: 'error',
-        title: 'Upload Failed ',
-        text: err.message,
-        showConfirmButton: true,
+        title: errorTitle,
+        text: errorText,
       });
+
     } finally {
       setIsLoading(false);
     }
@@ -141,8 +158,8 @@ function App() {
     <div className="min-h-screen flex flex-col items-center justify-center p-4 sm:p-6 bg-gray-50">
       <div className="w-full max-w-lg bg-white rounded-xl shadow-xl p-6 sm:p-8 space-y-6">
         <div className="text-center">
-          <h1 className="text-3xl font-bold text-gray-800">Publish Your Research</h1>
-          <p className="text-sm text-gray-500">Securely upload to IPFS & Solana</p>
+          <h1 className="text-3xl font-bold text-gray-800">Decentralized Science Framework</h1>
+          <p className="text-sm text-gray-500">Securely upload to blockchain & IPFS</p>
         </div>
 
         <UserGuide />
