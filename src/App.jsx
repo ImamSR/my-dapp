@@ -20,15 +20,15 @@ function UserGuide() {
     <div className="mb-6 p-4 bg-purple-50 border border-purple-200 rounded-lg">
       <h2 className="text-lg font-semibold text-purple-800 mb-3">How It Works 📝</h2>
       <ol className="list-decimal list-inside text-sm text-gray-700 space-y-2">
-        <li><strong>Connect Wallet:</strong> Use the button below to connect your Solana wallet.</li>
-        <li><strong>Fill in Details:</strong> Provide a title and select your research file.</li>
-        <li><strong>Agree & Publish:</strong> Accept the terms and click "Publish" to approve the transaction.
+        <li><strong>Connect Wallet :</strong> Use the button below to connect your Solana wallet.</li>
+        <li><strong>Fill in Details :</strong> Provide a title and select your research file.</li>
+        <li><strong>Agree & Publish :</strong> Accept the terms and click "Publish" to approve the transaction.
           <div className="mt-2 pl-4 text-xs">
             <p className="text-purple-700"><span className="font-semibold">Gas Fee:</span> A small network fee is required.</p>
             <p className="text-gray-600">- Est. Fee: ~{estimatedFeeSOL} SOL (~${estimatedFeeUSD} USD)</p>
           </div>
         </li>
-        <li><strong>Verify:</strong> Your file is stored on IPFS and its metadata is on the Solana blockchain!</li>
+        <li><strong>Verify :</strong> Your file is stored on IPFS and its metadata is on the Solana blockchain!</li>
       </ol>
     </div>
   );
@@ -141,7 +141,7 @@ function App() {
   useEffect(() => {
     const titleBytes = new TextEncoder().encode(title);
     if (titleBytes.length > 200 && title.length > 0) {
-      setTitleError(`Title is too long (${titleBytes.length}/200 bytes).`);
+      setTitleError(`Title is too long (${titleBytes.length}/200 letter).`);
     } else {
       setTitleError('');
     }
@@ -169,18 +169,29 @@ function App() {
         </div>
 
         <fieldset disabled={!wallet.connected || isLoading} className="space-y-6">
-          <div>
-            <label htmlFor="titleInput" className="block text-sm font-medium text-gray-700 mb-1">Paper Title</label>
-            <input
-              type="text"
-              id="titleInput"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="e.g., A Brief History of Time"
-              className={`mt-1 block w-full border rounded-md shadow-sm py-2 px-3 focus:outline-none sm:text-sm ${titleError ? 'border-red-500 focus:ring-red-500 focus:border-red-500' : 'border-gray-300 focus:ring-purple-500 focus:border-purple-500'}`}
-            />
-            {titleError && <p className="mt-1 text-xs text-red-600">{titleError}</p>}
-          </div>
+         <div>
+          <label htmlFor="titleInput" className="block text-sm font-medium text-gray-700 mb-1">Paper Title</label>
+          <textarea
+            id="titleInput"
+            value={title}
+            onChange={(e) => {
+              setTitle(e.target.value);
+
+              const textarea = e.target;
+              textarea.style.height = 'auto'; 
+              textarea.style.height = textarea.scrollHeight + 'px'; 
+            }}
+            placeholder="e.g., A Brief History of Time"
+            className={`mt-1 block w-full border text-justify rounded-md shadow-sm py-2 px-3 overflow-hidden resize-none focus:outline-none sm:text-sm ${
+              titleError
+                ? 'border-red-500 focus:ring-red-500 focus:border-red-500'
+                : 'border-gray-300 focus:ring-purple-500 focus:border-purple-500'
+            }`}
+            rows={1}
+            style={{ minHeight: '2.25rem' }} 
+          />
+          {titleError && <p className="mt-1 text-xs text-red-600">{titleError}</p>}
+        </div>
 
           <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Research Paper</label>
