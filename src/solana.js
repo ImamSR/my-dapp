@@ -94,27 +94,25 @@ export async function fetchAllPaperAccounts() {
     for (const paper of accounts) {
       try {
         const signatures = await connection.getSignaturesForAddress(paper.publicKey, { limit: 1 });
-        const txid = signatures.length > 0 ? signatures[0].signature : null;
+        const sig = signatures[0];
+        const txid = sig?.signature ?? null;
+        const blockTime = sig?.blockTime ?? null; // ✅ simpan blockTime
 
         accountsWithTxids.push({
           publicKey: paper.publicKey,
           account: {
             ...paper.account,
-            txid
-          }
+            txid,
+            blockTime,
+          },
         });
       } catch (e) {
-        console.warn(`Could not fetch signature for account ${paper.publicKey.toBase58()}`);
         accountsWithTxids.push({
           publicKey: paper.publicKey,
-          account: {
-            ...paper.account,
-            txid: null
-          }
+          account: { ...paper.account, txid: null, blockTime: null },
         });
       }
     }
-
     return accountsWithTxids;
   } catch (error) {
     console.error("Error fetching all paper accounts:", error);
